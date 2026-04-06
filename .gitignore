@@ -1,0 +1,12 @@
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.ca_ast/
+.ca_pipeline/
+.chroma/
+ca_logs/
+backend/logs/
+backend/recordings/
+backend/formcheck.db
+backend/pose_landmarker_full.task

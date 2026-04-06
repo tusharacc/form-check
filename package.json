@@ -1,0 +1,13 @@
+{
+  "name": "formcheck",
+  "version": "1.0.0",
+  "description": "Real-time exercise posture coach using webcam and local AI",
+  "main": "main.js",
+  "scripts": {
+    "start": "bash start.sh",
+    "electron": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^30.0.0"
+  }
+}

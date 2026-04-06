@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FormCheck</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Calibration overlay -->
+    <div id="calibration-overlay" class="overlay">
+      <div class="overlay-box">
+        <h2>Calibrating…</h2>
+        <p>Stand in full view and hold a neutral pose</p>
+        <div id="cal-progress-bar"><div id="cal-progress-fill"></div></div>
+      </div>
+    </div>
+
+    <!-- Main layout — always visible; calibration overlay sits on top via z-index -->
+    <div id="main-layout">
+      <canvas id="video-canvas"></canvas>
+
+      <div id="sidebar">
+        <div id="exercise-label">—</div>
+        <div id="severity-badge" class="badge ok">OK</div>
+        <div id="tip-text"></div>
+        <div id="latency-label"></div>
+        <hr>
+        <button id="start-btn">Start Session</button>
+        <button id="stop-btn" disabled>Stop Session</button>
+        <hr>
+        <h3>Journal</h3>
+        <table id="journal-table">
+          <thead><tr><th>Time</th><th>Exercise</th><th>Severity</th></tr></thead>
+          <tbody id="journal-body"></tbody>
+        </table>
+        <div id="session-summary" style="display:none;">
+          <hr>
+          <h3>Session Summary</h3>
+          <p id="summary-exercises">—</p>
+          <p id="summary-reps">—</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

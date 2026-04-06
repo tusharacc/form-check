@@ -1,0 +1,95 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #111;
+  color: #eee;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Calibration overlay ─────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.overlay-box {
+  background: #1e1e1e;
+  border-radius: 12px;
+  padding: 2rem 3rem;
+  text-align: center;
+}
+.overlay-box h2 { margin-bottom: .5rem; font-size: 1.5rem; }
+.overlay-box p  { color: #aaa; margin-bottom: 1rem; }
+#cal-progress-bar {
+  width: 260px; height: 8px;
+  background: #333; border-radius: 4px; overflow: hidden;
+}
+#cal-progress-fill {
+  height: 100%; width: 0%;
+  background: #4caf50; transition: width 0.3s;
+}
+
+/* ── Main layout ─────────────────────────────────────────────────────── */
+#main-layout {
+  display: flex;
+  height: 100vh;
+}
+#video-canvas {
+  flex: 1;
+  min-width: 0;       /* allow flex item to shrink below intrinsic width */
+  min-height: 0;
+  background: #222;
+  display: block;
+}
+#sidebar {
+  width: 260px;
+  background: #1a1a1a;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  overflow-y: auto;
+}
+#exercise-label { font-size: 1.3rem; font-weight: bold; }
+#reps-label     { color: #aaa; }
+
+.badge {
+  display: inline-block;
+  padding: .25rem .75rem;
+  border-radius: 12px;
+  font-weight: bold;
+  font-size: .9rem;
+}
+.badge.ok       { background: #1b5e20; color: #a5d6a7; }
+.badge.warning  { background: #e65100; color: #ffe0b2; }
+.badge.critical { background: #b71c1c; color: #ffcdd2; }
+
+#tip-text { font-size: .85rem; color: #ccc; font-style: italic; min-height: 2rem; }
+
+button {
+  padding: .5rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .9rem;
+}
+#start-btn { background: #2e7d32; color: #fff; }
+#stop-btn  { background: #c62828; color: #fff; }
+button:disabled { opacity: .4; cursor: default; }
+
+/* ── Journal table ───────────────────────────────────────────────────── */
+#journal-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+#journal-table th, #journal-table td {
+  padding: .25rem .3rem;
+  text-align: left;
+  border-bottom: 1px solid #2a2a2a;
+}
+#journal-table th { color: #888; }
+
+.hidden { display: none !important; }
