@@ -23,19 +23,21 @@ log = get_logger(__name__)
 
 # ── Conditional HealthKit import ──────────────────────────────────────────────
 try:
-    from Foundation import NSSet
+    from Foundation import NSSet, NSSortDescriptor
     from HealthKit import (
         HKHealthStore,
         HKObjectType,
         HKQuantityTypeIdentifierHeartRate,
         HKUnit,
         HKSampleQuery,
-        HKSampleSortIdentifierStartDate,
     )
-    from Foundation import NSSortDescriptor
+    # HKSampleSortIdentifierStartDate is a string constant in pyobjc, not an importable symbol
+    HKSampleSortIdentifierStartDate = "startDate"
     _HK_AVAILABLE = True
-except Exception:
+    _HK_IMPORT_ERR = None
+except Exception as _hk_import_exc:
     _HK_AVAILABLE = False
+    _HK_IMPORT_ERR = str(_hk_import_exc)
 
 
 class WatchBridge:
@@ -43,6 +45,9 @@ class WatchBridge:
         self._store = HKHealthStore.alloc().init() if _HK_AVAILABLE else None
         self._authorized = False
         log.info("WatchBridge initialised — healthkit_available=%s", _HK_AVAILABLE)
+        if not _HK_AVAILABLE and _HK_IMPORT_ERR:
+            log.warning("HealthKit import failed: %s", _HK_IMPORT_ERR)
+            log.warning("Install with: pip install pyobjc-framework-HealthKit")
 
     # ── Authorization ─────────────────────────────────────────────────────────
 

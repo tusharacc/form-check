@@ -22,7 +22,7 @@ class WakeLock:
             log.debug("WakeLock.acquire: wake lock already held")
             return
         try:
-            self._proc = subprocess.Popen(["caffeinate", "-i", "-w", str(os.getpid())])
+            self._proc = subprocess.Popen(["caffeinate", "-d", "-i", "-w", str(os.getpid())])
             log.info("Wake lock acquired — caffeinate pid=%d", self._proc.pid)
         except Exception as exc:
             log.warning("WakeLock.acquire failed: %s", exc)
