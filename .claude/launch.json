@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "renderer",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "-p", "3333", "renderer"],
-      "port": 3333
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["/Users/tusharsaurabh/Documents/Projects/Python/formcheck/renderer/serve.sh"],
+      "port": 3333,
+      "autoPort": true
     }
   ]
 }
