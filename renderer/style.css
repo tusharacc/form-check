@@ -72,6 +72,20 @@ body {
 
 #tip-text { font-size: .85rem; color: #ccc; font-style: italic; min-height: 2rem; }
 
+/* ── Session timer ───────────────────────────────────────────────────── */
+#session-timer {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: 1.6rem;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  letter-spacing: .03em;
+}
+#timer-icon { font-size: 1.1rem; }
+#session-timer.finished { color: #aaa; }
+
 button {
   padding: .5rem;
   border: none;

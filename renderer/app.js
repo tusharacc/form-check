@@ -20,10 +20,54 @@ const summaryExEl  = document.getElementById('summary-exercises');
 const summaryRepsEl = document.getElementById('summary-reps');
 const hrDisplay    = document.getElementById('hr-display');
 const hrValueEl    = document.getElementById('hr-value');
+const timerDiv     = document.getElementById('session-timer');
+const timerValueEl = document.getElementById('timer-value');
 
 let ws = null;
 let calProgress = 0;
 let calTimer = null;
+
+// ── Session timer ─────────────────────────────────────────────────────────────
+const timer = {
+  _start:    null,
+  _interval: null,
+
+  _fmt(secs) {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    return `${m}:${String(s).padStart(2,'0')}`;
+  },
+
+  start() {
+    this._start = Date.now();
+    timerDiv.classList.remove('hidden', 'finished');
+    timerValueEl.textContent = '0:00';
+    this._interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - this._start) / 1000);
+      timerValueEl.textContent = this._fmt(elapsed);
+    }, 1000);
+    log.info('Session timer started');
+  },
+
+  stop() {
+    if (this._interval) {
+      clearInterval(this._interval);
+      this._interval = null;
+    }
+    timerDiv.classList.add('finished');
+    const elapsed = this._start ? Math.floor((Date.now() - this._start) / 1000) : 0;
+    timerValueEl.textContent = this._fmt(elapsed);
+    log.info(`Session timer stopped — elapsed ${this._fmt(elapsed)}`);
+  },
+
+  reset() {
+    this.stop();
+    timerDiv.classList.add('hidden');
+    timerValueEl.textContent = '0:00';
+  },
+};
 
 // ── Frontend logger ───────────────────────────────────────────────────────────
 const log = {
@@ -128,7 +172,12 @@ function connect() {
         addJournalRow(msg);
         break;
 
+      case 'session_started':
+        timer.start();
+        break;
+
       case 'session_summary': {
+        timer.stop();
         summaryDiv.style.display = 'block';
         summaryExEl.textContent =
           'Exercises: ' + (msg.exercises.length ? msg.exercises.join(', ') : 'Unknown');
@@ -246,6 +295,7 @@ startBtn.addEventListener('click', () => {
     summaryDiv.style.display = 'none';
     hrDisplay.style.display  = 'none';
     hrValueEl.textContent    = '--';
+    timer.reset();
   } else {
     log.warn('start_session clicked but WebSocket is not open (state=' + ws?.readyState + ')');
   }
