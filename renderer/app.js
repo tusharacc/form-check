@@ -14,6 +14,16 @@ const tipEl        = document.getElementById('tip-text');
 const latencyEl    = document.getElementById('latency-label');
 const startBtn     = document.getElementById('start-btn');
 const stopBtn      = document.getElementById('stop-btn');
+const reportBtn    = document.getElementById('report-btn');
+const reportModal  = document.getElementById('report-modal');
+const reportClose  = document.getElementById('report-close');
+const reportLoading = document.getElementById('report-loading');
+const reportContent = document.getElementById('report-content');
+const reportMeta   = document.getElementById('report-meta');
+const reportCats   = document.getElementById('report-categories');
+const reportExs    = document.getElementById('report-exercises');
+const reportInsights = document.getElementById('report-insights');
+const reportPlan   = document.getElementById('report-plan');
 const journalBody  = document.getElementById('journal-body');
 const summaryDiv   = document.getElementById('session-summary');
 const summaryExEl  = document.getElementById('summary-exercises');
@@ -200,6 +210,22 @@ function connect() {
         log.debug(`Heart rate: ${msg.bpm} bpm`);
         break;
 
+      case 'report_loading':
+        log.info('Report generation started on backend');
+        break;
+
+      case 'report':
+        log.info('Report received');
+        renderReport(msg.data);
+        break;
+
+      case 'report_error':
+        log.error(`Report generation failed: ${msg.reason}`);
+        reportLoading.classList.add('hidden');
+        reportContent.classList.remove('hidden');
+        reportMeta.innerHTML = `<p style="color:#c62828">⚠️ ${msg.reason}</p>`;
+        break;
+
       case 'error':
         log.error(`Server error: ${msg.reason}`);
         break;
@@ -311,6 +337,114 @@ stopBtn.addEventListener('click', () => {
     log.warn('stop_session clicked but WebSocket is not open (state=' + ws?.readyState + ')');
   }
 });
+
+// ── Weekly Report ─────────────────────────────────────────────────────────────
+
+const CAT_CLASS = {
+  'Upper Body': 'cat-upper',
+  'Lower Body': 'cat-lower',
+  'Core':       'cat-core',
+  'Cardio':     'cat-cardio',
+  'General':    'cat-general',
+};
+
+function openReportModal() {
+  reportModal.classList.remove('hidden');
+  reportLoading.classList.remove('hidden');
+  reportContent.classList.add('hidden');
+  if (ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'generate_report', days: 30 }));
+    log.info('generate_report sent');
+  } else {
+    log.warn('Cannot generate report — WebSocket not open');
+  }
+}
+
+function closeReportModal() {
+  reportModal.classList.add('hidden');
+}
+
+function renderReport(data) {
+  // ── Meta row ──
+  const hrs = Math.floor(data.total_minutes / 60);
+  const mins = data.total_minutes % 60;
+  const timeStr = hrs > 0 ? `${hrs}h ${mins}m` : `${data.total_minutes}m`;
+  reportMeta.innerHTML = `
+    <div class="meta-card">
+      <div class="val">${data.total_sessions}</div>
+      <div class="lbl">Sessions</div>
+    </div>
+    <div class="meta-card">
+      <div class="val">${timeStr}</div>
+      <div class="lbl">Total Time</div>
+    </div>
+    <div class="meta-card">
+      <div class="val">${data.exercises.length}</div>
+      <div class="lbl">Exercises</div>
+    </div>
+    <div class="meta-card">
+      <div class="val">${data.period_days}d</div>
+      <div class="lbl">Period</div>
+    </div>`;
+
+  // ── Category bars ──
+  const maxCat = Math.max(1, ...Object.values(data.category_counts));
+  const catOrder = ['Upper Body', 'Lower Body', 'Core', 'Cardio', 'General'];
+  reportCats.innerHTML = '<h3>Body-Part Coverage</h3>' +
+    catOrder.map(cat => {
+      const count = data.category_counts[cat] ?? 0;
+      const pct   = Math.round((count / maxCat) * 100);
+      const cls   = CAT_CLASS[cat] || 'cat-general';
+      return `<div class="cat-row">
+        <span class="cat-label">${cat}</span>
+        <div class="cat-bar-wrap">
+          <div class="cat-bar ${cls}" style="width:${pct}%"></div>
+        </div>
+        <span class="cat-count">${count}</span>
+      </div>`;
+    }).join('');
+
+  // ── Exercise chips ──
+  if (data.exercises.length) {
+    reportExs.innerHTML = '<h3>Exercises Performed</h3><div class="ex-chips">' +
+      data.exercises.map(e => {
+        const cls = CAT_CLASS[e.category] || 'cat-general';
+        return `<span class="ex-chip">
+          <span class="ex-dot ${cls}"></span>
+          ${e.name} <span style="color:#666">&times;${e.sessions}</span>
+        </span>`;
+      }).join('') + '</div>';
+  } else {
+    reportExs.innerHTML = '<h3>Exercises Performed</h3><p style="color:#666">No exercise data yet — complete a session first.</p>';
+  }
+
+  // ── Insights ──
+  reportInsights.innerHTML = `<h3>Coach's Analysis</h3><p>${data.insights || '—'}</p>`;
+
+  // ── Plan cards ──
+  if (data.plan?.length) {
+    const cards = data.plan.map(day => {
+      const isRest = day.focus?.toLowerCase().includes('rest') || !day.exercises?.length;
+      const exList = (day.exercises || []).join('<br>');
+      return `<div class="plan-card ${isRest ? 'rest' : ''}">
+        <div class="plan-day">${day.day}</div>
+        <div class="plan-focus">${day.focus || 'Rest'}</div>
+        <div class="plan-exs">${exList || '—'}</div>
+        ${day.notes ? `<div class="plan-note">${day.notes}</div>` : ''}
+      </div>`;
+    }).join('');
+    reportPlan.innerHTML = '<h3>Next Week\'s Plan</h3><div class="plan-grid">' + cards + '</div>';
+  } else {
+    reportPlan.innerHTML = '<h3>Next Week\'s Plan</h3><p style="color:#666">Plan unavailable.</p>';
+  }
+
+  reportLoading.classList.add('hidden');
+  reportContent.classList.remove('hidden');
+}
+
+reportBtn.addEventListener('click', openReportModal);
+reportClose.addEventListener('click', closeReportModal);
+document.getElementById('report-backdrop').addEventListener('click', closeReportModal);
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 log.info('FormCheck renderer initialising');

@@ -38,6 +38,8 @@
         <button id="start-btn">Start Session</button>
         <button id="stop-btn" disabled>Stop Session</button>
         <hr>
+        <button id="report-btn">📊 Weekly Report</button>
+        <hr>
         <h3>Journal</h3>
         <table id="journal-table">
           <thead><tr><th>Time</th><th>Exercise</th><th>Severity</th></tr></thead>
@@ -52,6 +54,30 @@
       </div>
     </div>
   </div>
+  <!-- Weekly Report modal -->
+  <div id="report-modal" class="hidden">
+    <div id="report-backdrop"></div>
+    <div id="report-panel">
+      <div id="report-header">
+        <h2>Weekly Report</h2>
+        <button id="report-close">✕</button>
+      </div>
+      <div id="report-body">
+        <div id="report-loading" class="hidden">
+          <div class="spinner"></div>
+          <p>Generating report… this may take ~30 s</p>
+        </div>
+        <div id="report-content" class="hidden">
+          <div id="report-meta"></div>
+          <div id="report-categories"></div>
+          <div id="report-exercises"></div>
+          <div id="report-insights"></div>
+          <div id="report-plan"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

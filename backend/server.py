@@ -31,6 +31,7 @@ from voice       import VoiceEngine
 from sound       import SoundEngine
 from watchbridge import WatchBridge
 from wakelock    import WakeLock
+from reporter    import generate_report
 
 log  = get_logger(__name__)
 slog = get_logger("session")
@@ -542,6 +543,21 @@ async def handle_client(websocket) -> None:
                 # Step 7 — reset state for next session
                 state["angle_series"]       = {k: [] for k in _JOINTS}
                 state["detected_exercises"] = []
+
+            elif msg_type == "generate_report":
+                days = int(msg.get("days", 30))
+                log.info("generate_report requested — past %d days", days)
+                await websocket.send(json.dumps({"type": "report_loading"}))
+                try:
+                    report = await loop.run_in_executor(None, generate_report, days)
+                    await websocket.send(json.dumps({"type": "report", "data": report}))
+                    log.info("report sent to client")
+                except Exception as _rep_err:
+                    log.error("generate_report failed: %s", _rep_err)
+                    await websocket.send(json.dumps({
+                        "type":   "report_error",
+                        "reason": str(_rep_err),
+                    }))
 
             elif msg_type == "set_interval":
                 # Future: allow UI to change analysis interval
