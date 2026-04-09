@@ -22,9 +22,10 @@ log = get_logger(__name__)
 _MODEL = "llama3.2-vision:11b"
 
 _FORM_SYSTEM = (
-    "You are a form coach. Check only posture and alignment.\n"
-    "Return JSON: {\"issues\":[], \"severity\":\"OK\", \"tip\":\"\"}.\n"
+    "You are a form coach. Identify the exercise being performed and check posture/alignment.\n"
+    "Return JSON: {\"exercise\":\"Push-Up\",\"issues\":[], \"severity\":\"OK\", \"tip\":\"\"}.\n"
     "Severity: OK=correct form, WARNING=visible deviation, CRITICAL=injury risk.\n"
+    "For 'exercise' use a short common name (e.g. 'Push-Up', 'Squat', 'Bicep Curl').\n"
     "Be critical — flag any misalignment you can see."
 )
 
@@ -41,6 +42,7 @@ class FormCheckResult:
     issues:   list = field(default_factory=list)
     severity: str  = "OK"
     tip:      str  = ""
+    exercise: str  = ""   # exercise name identified in this frame, "" if unknown
 
 
 @dataclass
@@ -114,10 +116,12 @@ class Analyzer:
                     text = text[4:]
 
             parsed = json.loads(text)
+            raw_ex = parsed.get("exercise", "")
             result = FormCheckResult(
                 issues   = parsed.get("issues", []),
                 severity = parsed.get("severity", "OK"),
                 tip      = parsed.get("tip", ""),
+                exercise = raw_ex if raw_ex and raw_ex.lower() not in ("unknown", "n/a", "") else "",
             )
 
             log.info(

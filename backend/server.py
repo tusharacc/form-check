@@ -73,18 +73,27 @@ def _joint_angle(lm_list, a: int, b: int, c: int) -> float:
     return math.degrees(math.acos(cosine))
 
 
-def _count_reps(angle_series: list) -> int:
-    """Count rep cycles from a joint angle time series.
+# Named joints sampled for rep counting (MediaPipe landmark indices)
+_JOINTS = {
+    "left_elbow":  (11, 13, 15),
+    "right_elbow": (12, 14, 16),
+    "left_knee":   (23, 25, 27),
+    "right_knee":  (24, 26, 28),
+}
 
-    A rep cycle = angle crosses below LOW_THRESHOLD then above HIGH_THRESHOLD
-    (or vice versa). Returns number of complete cycles (transitions // 2).
+
+def _count_reps_series(series: list) -> int:
+    """Count rep cycles from a single joint's angle time series.
+
+    A rep = angle crosses below LOW then above HIGH (or vice versa).
+    Returns complete cycles (transitions // 2).
     """
     LOW, HIGH = 110.0, 150.0
-    if not angle_series:
+    if not series:
         return 0
     state       = None
     transitions = 0
-    for angle in angle_series:
+    for angle in series:
         if state is None:
             if angle < LOW:
                 state = "low"
@@ -97,6 +106,18 @@ def _count_reps(angle_series: list) -> int:
             transitions += 1
             state = "low"
     return transitions // 2
+
+
+def _count_reps(angle_dict: dict) -> int:
+    """Count reps across all tracked joints; return the max over all joints.
+
+    Each joint's series is counted independently so interleaving different
+    joints' angles (which have unrelated magnitudes) never creates false
+    transitions.  The joint with the most reps wins — that's the one actually
+    driving the exercise motion.
+    """
+    counts = [_count_reps_series(s) for s in angle_dict.values() if s]
+    return max(counts) if counts else 0
 
 
 def _sample_keyframes(video_path, interval_s: int = 30, max_frames: int = 5) -> list:
@@ -182,9 +203,9 @@ async def camera_loop(websocket, camera: Camera, state: dict) -> None:
         if _frame_counter % 3 == 0 and state.get("active"):
             lms = camera._last_landmarks
             if lms is not None:
-                for (a, b, c) in [(11, 13, 15), (12, 14, 16), (23, 25, 27), (24, 26, 28)]:
+                for name, (a, b, c) in _JOINTS.items():
                     if max(a, b, c) < len(lms):
-                        state["angle_series"].append(_joint_angle(lms, a, b, c))
+                        state["angle_series"][name].append(_joint_angle(lms, a, b, c))
 
         await asyncio.sleep(0.033)  # ~30 fps target
 
@@ -243,8 +264,17 @@ async def analysis_loop(websocket, camera: Camera, analyzer: Analyzer,
         latency = round(time.time() - t_start, 1)
         sid     = state.get("session_id")
 
+        # Collect exercise name identified in this real-time frame
+        ex_name = result.exercise
+        if ex_name:
+            exs = state["detected_exercises"]
+            if ex_name not in exs:
+                exs.append(ex_name)
+                alog.info("Exercise identified: %s (total distinct: %d)", ex_name, len(exs))
+
         alog.info(
-            "Analysis — severity=%s  issues=%s  latency=%.1fs  session_id=%s",
+            "Analysis — exercise=%s severity=%s  issues=%s  latency=%.1fs  session_id=%s",
+            ex_name or "?",
             result.severity,
             result.issues if result.issues else "none",
             latency, sid,
@@ -255,7 +285,7 @@ async def analysis_loop(websocket, camera: Camera, analyzer: Analyzer,
             for issue in (result.issues or [""]):
                 log_event(
                     session_id=sid,
-                    exercise=None,
+                    exercise=ex_name or None,
                     severity=result.severity,
                     issue=issue or "",
                     tip=result.tip,
@@ -336,11 +366,12 @@ async def handle_client(websocket) -> None:
     wakelock = WakeLock()
 
     state = {
-        "proportions":  None,
-        "active":       False,
-        "session_id":   None,
-        "recorder":     None,
-        "angle_series": [],
+        "proportions":        None,
+        "active":             False,
+        "session_id":         None,
+        "recorder":           None,
+        "angle_series":       {k: [] for k in _JOINTS},   # per-joint, never interleaved
+        "detected_exercises": [],                          # names from real-time analysis
     }
 
     # Start camera stream immediately so the user sees themselves during calibration
@@ -393,9 +424,10 @@ async def handle_client(websocket) -> None:
                     continue
 
                 sid = start_session()
-                state["session_id"]   = sid
-                state["active"]       = True
-                state["angle_series"] = []
+                state["session_id"]         = sid
+                state["active"]             = True
+                state["angle_series"]       = {k: [] for k in _JOINTS}
+                state["detected_exercises"] = []
 
                 # Start video recording
                 try:
@@ -455,37 +487,45 @@ async def handle_client(websocket) -> None:
                     except Exception as _kf_err:
                         slog.warning("Keyframe sampling failed: %s", _kf_err)
 
-                # Step 4 — post-session Ollama summary (best-effort)
+                # Step 4 — exercise names: prefer real-time identifications collected
+                # during analysis_loop; fall back to post-session Ollama keyframe scan
+                # only if none were found during the session.
+                realtime_exercises = [
+                    _normalise_exercise(n) for n in state["detected_exercises"] if n
+                ]
+
                 summary_result = None
-                if keyframes:
+                if not realtime_exercises and keyframes:
+                    # No real-time names — try post-session keyframe scan as fallback
                     try:
                         summary_result = await loop.run_in_executor(
                             None, analyzer.analyze_summary, keyframes
                         )
                         slog.info(
-                            "Post-session summary: exercises=%s total_reps=%d",
+                            "Post-session summary fallback: exercises=%s",
                             [e.get("name") for e in summary_result.exercises],
-                            summary_result.total_reps,
                         )
                     except Exception as _sum_err:
                         slog.warning(
-                            "analyze_summary failed: %s — sending empty summary", _sum_err
+                            "analyze_summary fallback failed: %s", _sum_err
                         )
 
-                # Step 5 — count angle-based reps
+                # Step 5 — count angle-based reps (per-joint, take max)
                 angle_reps = _count_reps(state["angle_series"])
+                total_samples = sum(len(s) for s in state["angle_series"].values())
                 slog.info(
-                    "Angle-based rep count: %d (from %d angle samples)",
-                    angle_reps, len(state["angle_series"]),
+                    "Angle-based rep count: %d  (samples per joint: %s)",
+                    angle_reps,
+                    {k: len(v) for k, v in state["angle_series"].items()},
                 )
 
-                # Step 6 — send session_summary (always send, even if Ollama failed)
-                exercises = []
-                if summary_result is not None:
+                # Step 6 — build final exercise list
+                exercises = realtime_exercises or []
+                if not exercises and summary_result is not None:
                     seen = set()
                     for e in summary_result.exercises:
                         name = _normalise_exercise(e.get("name", ""))
-                        if name and name not in seen:
+                        if name and name.lower() not in ("unknown", "n/a") and name not in seen:
                             exercises.append(name)
                             seen.add(name)
 
@@ -499,8 +539,9 @@ async def handle_client(websocket) -> None:
                     exercises, angle_reps,
                 )
 
-                # Step 7 — reset angle series
-                state["angle_series"] = []
+                # Step 7 — reset state for next session
+                state["angle_series"]       = {k: [] for k in _JOINTS}
+                state["detected_exercises"] = []
 
             elif msg_type == "set_interval":
                 # Future: allow UI to change analysis interval
