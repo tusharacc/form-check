@@ -12,6 +12,7 @@ cadence (~40 s inference + overhead). The old 5 s value was misleading.
 import asyncio
 import base64
 import json
+import logging
 import math
 import os
 import time
@@ -35,6 +36,10 @@ log  = get_logger(__name__)
 slog = get_logger("session")
 alog = get_logger("analysis")
 clog = get_logger("camera")
+
+# Suppress "opening handshake failed" noise from bare-TCP port probes
+# (main.js uses net.createConnection to wait for the port to be ready)
+logging.getLogger("websockets.server").setLevel(logging.ERROR)
 
 ANALYSIS_INTERVAL = 45   # seconds — matches real ~40 s M3 Metal inference latency
 HR_INTERVAL       = 30   # seconds between heart rate polls
@@ -348,12 +353,12 @@ async def handle_client(websocket) -> None:
 
         loop = asyncio.get_running_loop()
 
-        # Request HealthKit authorization in background (non-blocking)
-        await loop.run_in_executor(None, watch.request_authorization)
+        # Request HealthKit authorization — fire-and-forget, never block calibration
+        loop.run_in_executor(None, watch.request_authorization)
 
         calibrator = Calibrator()
         try:
-            proportions = await loop.run_in_executor(None, calibrator.run, camera)
+            proportions = await calibrator.run_async(camera)
             state["proportions"] = proportions
             await websocket.send(json.dumps({"type": "calibration_done"}))
             log.info("Calibration succeeded — proportions stored in state")

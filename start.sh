@@ -20,8 +20,24 @@ trap cleanup EXIT
 if lsof -ti:8765 > /dev/null 2>&1; then
     echo "[FormCheck] Killing stale backend on port 8765..."
     kill $(lsof -ti:8765) 2>/dev/null || true
-    sleep 0.5
+    # Poll up to 5 s for the port to actually be released
+    for i in $(seq 1 10); do
+        sleep 0.5
+        if ! nc -z 127.0.0.1 8765 2>/dev/null; then
+            break
+        fi
+        if [[ $i -eq 10 ]]; then
+            echo "[FormCheck] WARNING: port 8765 still in use after 5 s — trying SIGKILL"
+            kill -9 $(lsof -ti:8765) 2>/dev/null || true
+            sleep 1
+        fi
+    done
+    echo "[FormCheck] Port 8765 is free."
 fi
+
+# ── Ensure HealthKit dependency is installed ──────────────────────────────────
+echo "[FormCheck] Checking Python dependencies..."
+pip install pyobjc-framework-HealthKit --quiet --disable-pip-version-check 2>/dev/null || true
 
 # ── Start Python backend ──────────────────────────────────────────────────────
 echo "[FormCheck] Starting Python backend..."

@@ -10,6 +10,7 @@ dependencies = [
     "numpy>=1.26.0",
     "ollama>=0.4.0",
     "pygame>=2.5.0",
+    "pyobjc-framework-HealthKit>=10.0",
 ]
 
 [build-system]
