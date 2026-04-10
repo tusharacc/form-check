@@ -19,7 +19,24 @@ from logger import get_logger
 
 log = get_logger(__name__)
 
-_MODEL = "llama3.2-vision:11b"
+_BASE_MODEL      = "llama3.2-vision:11b"
+_PREFERRED_MODEL = "formcheck-vision"
+
+
+def _pick_model() -> str:
+    """Use formcheck-vision if available, else fall back to base model."""
+    try:
+        models = ollama.list()
+        if any(m.model.startswith(_PREFERRED_MODEL) for m in models.models):
+            log.info("Analyzer: using custom model %s", _PREFERRED_MODEL)
+            return _PREFERRED_MODEL
+    except Exception:
+        pass
+    log.info("Analyzer: formcheck-vision not found, using %s", _BASE_MODEL)
+    return _BASE_MODEL
+
+
+_MODEL = _pick_model()
 
 _FORM_SYSTEM = (
     "You are a form coach. Identify the exercise being performed and check posture/alignment.\n"

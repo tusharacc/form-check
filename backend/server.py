@@ -32,6 +32,7 @@ from sound       import SoundEngine
 from watchbridge import WatchBridge
 from wakelock    import WakeLock
 from reporter    import generate_report
+from reanalyzer  import reanalyze_session
 
 log  = get_logger(__name__)
 slog = get_logger("session")
@@ -543,6 +544,77 @@ async def handle_client(websocket) -> None:
                 # Step 7 — reset state for next session
                 state["angle_series"]       = {k: [] for k in _JOINTS}
                 state["detected_exercises"] = []
+
+            elif msg_type == "list_sessions":
+                # Return sessions that have a stored video for reanalysis
+                import sqlite3 as _sqlite3
+                conn = _sqlite3.connect(DB_PATH)
+                rows = conn.execute(
+                    "SELECT id, start_time, end_time, video_path FROM sessions "
+                    "WHERE video_path IS NOT NULL ORDER BY id DESC"
+                ).fetchall()
+                conn.close()
+                sessions = [
+                    {
+                        "session_id": r[0],
+                        "date":       r[1][:10] if r[1] else "?",
+                        "start":      r[1][11:16] if r[1] else "?",
+                        "end":        r[2][11:16] if r[2] else "?",
+                        "video_path": r[3],
+                    }
+                    for r in rows
+                ]
+                await websocket.send(json.dumps({"type": "sessions_list", "sessions": sessions}))
+
+            elif msg_type == "reanalyze_session":
+                session_id = msg.get("session_id")
+                video_path = msg.get("video_path")
+                if not session_id or not video_path:
+                    await websocket.send(json.dumps({
+                        "type": "reanalyze_error", "reason": "Missing session_id or video_path"
+                    }))
+                    continue
+
+                log.info("reanalyze_session requested — session_id=%s", session_id)
+
+                async def _send_progress(pct, message):
+                    try:
+                        await websocket.send(json.dumps({
+                            "type": "reanalyze_progress",
+                            "pct":  pct,
+                            "msg":  message,
+                        }))
+                    except Exception:
+                        pass
+
+                # Progress callback must be sync (called from executor thread)
+                import asyncio as _asyncio
+                _loop = asyncio.get_running_loop()
+                def _progress_cb(pct, message):
+                    _asyncio.run_coroutine_threadsafe(_send_progress(pct, message), _loop)
+
+                await websocket.send(json.dumps({
+                    "type": "reanalyze_progress", "pct": 0, "msg": "Starting dense video analysis…"
+                }))
+
+                try:
+                    result = await loop.run_in_executor(
+                        None, reanalyze_session, session_id, video_path, _progress_cb
+                    )
+                    await websocket.send(json.dumps({
+                        "type":   "reanalyze_done",
+                        "session_id": session_id,
+                        "result": result,
+                    }))
+                    log.info(
+                        "reanalyze_session complete — session_id=%d exercises=%d",
+                        session_id, len(result["exercises"]),
+                    )
+                except Exception as _re_err:
+                    log.error("reanalyze_session failed: %s", _re_err, exc_info=True)
+                    await websocket.send(json.dumps({
+                        "type": "reanalyze_error", "reason": str(_re_err)
+                    }))
 
             elif msg_type == "generate_report":
                 days = int(msg.get("days", 30))

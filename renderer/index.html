@@ -62,17 +62,39 @@
         <h2>Weekly Report</h2>
         <button id="report-close">✕</button>
       </div>
+      <div id="report-tabs">
+        <button class="tab-btn active" data-tab="report-tab">📊 Report</button>
+        <button class="tab-btn" data-tab="reanalyze-tab">🎬 Re-analyze Videos</button>
+      </div>
       <div id="report-body">
-        <div id="report-loading" class="hidden">
-          <div class="spinner"></div>
-          <p>Generating report… this may take ~30 s</p>
+        <!-- Report tab -->
+        <div id="report-tab" class="tab-panel">
+          <div id="report-loading" class="hidden">
+            <div class="spinner"></div>
+            <p>Generating report… this may take ~30 s</p>
+          </div>
+          <div id="report-content" class="hidden">
+            <div id="report-meta"></div>
+            <div id="report-categories"></div>
+            <div id="report-exercises"></div>
+            <div id="report-insights"></div>
+            <div id="report-plan"></div>
+          </div>
         </div>
-        <div id="report-content" class="hidden">
-          <div id="report-meta"></div>
-          <div id="report-categories"></div>
-          <div id="report-exercises"></div>
-          <div id="report-insights"></div>
-          <div id="report-plan"></div>
+        <!-- Re-analyze tab -->
+        <div id="reanalyze-tab" class="tab-panel hidden">
+          <p class="reanalyze-intro">
+            Dense frame analysis (every 5 s) using <strong>formcheck-vision</strong> — identifies all exercises including Surya Namaskar poses, compound lifts, and yoga transitions. Takes ~2–5 min per session.
+          </p>
+          <div id="session-list-loading" class="hidden">
+            <div class="spinner"></div><p>Loading sessions…</p>
+          </div>
+          <div id="session-list"></div>
+          <div id="reanalyze-progress-wrap" class="hidden">
+            <div id="reanalyze-progress-label">Analyzing…</div>
+            <div id="reanalyze-bar-wrap"><div id="reanalyze-bar"></div></div>
+          </div>
+          <div id="reanalyze-result" class="hidden"></div>
         </div>
       </div>
     </div>

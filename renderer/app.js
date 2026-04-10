@@ -210,6 +210,28 @@ function connect() {
         log.debug(`Heart rate: ${msg.bpm} bpm`);
         break;
 
+      case 'sessions_list':
+        renderSessionList(msg.sessions);
+        break;
+
+      case 'reanalyze_progress':
+        reanalyzeBar.style.width = msg.pct + '%';
+        reanalyzeLabel.textContent = msg.msg;
+        break;
+
+      case 'reanalyze_done':
+        renderReanalyzeResult(msg.result);
+        break;
+
+      case 'reanalyze_error':
+        reanalyzeProgressWrap.classList.add('hidden');
+        reanalyzeResult.classList.remove('hidden');
+        reanalyzeResult.innerHTML = `<p style="color:#c62828">⚠️ ${msg.reason}</p>`;
+        document.querySelectorAll('.session-card button').forEach(b => {
+          b.disabled = false; b.textContent = 'Analyze';
+        });
+        break;
+
       case 'report_loading':
         log.info('Report generation started on backend');
         break;
@@ -445,6 +467,91 @@ function renderReport(data) {
 reportBtn.addEventListener('click', openReportModal);
 reportClose.addEventListener('click', closeReportModal);
 document.getElementById('report-backdrop').addEventListener('click', closeReportModal);
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.remove('hidden');
+    if (btn.dataset.tab === 'reanalyze-tab') loadSessionList();
+  });
+});
+
+// ── Re-analyze tab ────────────────────────────────────────────────────────────
+const sessionListEl       = document.getElementById('session-list');
+const sessionListLoading  = document.getElementById('session-list-loading');
+const reanalyzeProgressWrap = document.getElementById('reanalyze-progress-wrap');
+const reanalyzeLabel      = document.getElementById('reanalyze-progress-label');
+const reanalyzeBar        = document.getElementById('reanalyze-bar');
+const reanalyzeResult     = document.getElementById('reanalyze-result');
+
+let _sessionsLoaded = false;
+
+function loadSessionList() {
+  if (_sessionsLoaded) return;
+  sessionListLoading.classList.remove('hidden');
+  if (ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'list_sessions' }));
+  }
+}
+
+function renderSessionList(sessions) {
+  _sessionsLoaded = true;
+  sessionListLoading.classList.add('hidden');
+  if (!sessions.length) {
+    sessionListEl.innerHTML = '<p style="color:#666;font-size:.83rem">No recorded sessions found. Sessions with video recordings will appear here.</p>';
+    return;
+  }
+  sessionListEl.innerHTML = sessions.map(s => `
+    <div class="session-card">
+      <div class="session-info">
+        <div class="session-date">${s.date}</div>
+        <div class="session-time">${s.start} → ${s.end}</div>
+      </div>
+      <button onclick="startReanalyze(${s.session_id}, '${s.video_path}', this)">
+        Analyze
+      </button>
+    </div>`).join('');
+}
+
+function startReanalyze(sessionId, videoPath, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+  reanalyzeProgressWrap.classList.remove('hidden');
+  reanalyzeResult.classList.add('hidden');
+  reanalyzeBar.style.width = '0%';
+  reanalyzeLabel.textContent = 'Starting…';
+  if (ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'reanalyze_session', session_id: sessionId, video_path: videoPath }));
+  }
+}
+
+function renderReanalyzeResult(data) {
+  reanalyzeProgressWrap.classList.add('hidden');
+  reanalyzeResult.classList.remove('hidden');
+
+  const exRows = data.exercises.length
+    ? data.exercises.map(e => `
+        <div class="re-ex-row">
+          <span>${e.name}</span>
+          <span class="re-ex-count">${e.count} clip${e.count !== 1 ? 's' : ''}</span>
+        </div>`).join('')
+    : '<p style="color:#666">No exercises identified.</p>';
+
+  const durMin = Math.round(data.duration_s / 60);
+  reanalyzeResult.innerHTML = `
+    <h4>Found ${data.exercises.length} exercise${data.exercises.length !== 1 ? 's' : ''} in ${data.clips_analyzed} clips (${durMin} min video)</h4>
+    ${exRows}`;
+
+  // Re-enable all analyze buttons
+  document.querySelectorAll('.session-card button').forEach(b => {
+    b.disabled = false;
+    b.textContent = 'Analyze';
+  });
+  log.info(`Reanalysis done — ${data.exercises.length} exercises, ${data.clips_analyzed} clips`);
+}
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 log.info('FormCheck renderer initialising');

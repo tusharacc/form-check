@@ -243,3 +243,63 @@ button:disabled { opacity: .4; cursor: default; }
 
 /* Report button in sidebar */
 #report-btn { background: #1a237e; color: #c5cae9; }
+
+/* ── Report tabs ─────────────────────────────────────────────────────── */
+#report-tabs {
+  display: flex; gap: 0;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+  padding: 0 1.4rem;
+}
+.tab-btn {
+  background: none; border: none;
+  color: #888; font-size: .85rem;
+  padding: .6rem 1rem; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab-btn.active { color: #fff; border-bottom-color: #4caf50; }
+.tab-btn:hover:not(.active) { color: #ccc; }
+.tab-panel { display: block; }
+.tab-panel.hidden { display: none !important; }
+
+/* ── Re-analyze tab ─────────────────────────────────────────────────── */
+.reanalyze-intro {
+  font-size: .83rem; color: #999; margin-bottom: 1rem; line-height: 1.5;
+}
+.session-card {
+  background: #252525; border-radius: 8px;
+  padding: .7rem 1rem; margin-bottom: .5rem;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .5rem;
+}
+.session-card .session-info { font-size: .83rem; color: #ccc; }
+.session-card .session-date { font-weight: bold; color: #fff; font-size: .88rem; }
+.session-card .session-time { color: #888; font-size: .78rem; }
+.session-card button {
+  background: #1a237e; color: #c5cae9;
+  font-size: .78rem; padding: .3rem .8rem;
+  white-space: nowrap; flex-shrink: 0;
+}
+.session-card button:disabled { opacity: .4; }
+#reanalyze-progress-wrap { margin-top: 1rem; }
+#reanalyze-progress-label { font-size: .83rem; color: #aaa; margin-bottom: .4rem; }
+#reanalyze-bar-wrap {
+  background: #2a2a2a; border-radius: 4px; height: 10px; overflow: hidden;
+}
+#reanalyze-bar {
+  height: 100%; width: 0%; background: #4caf50;
+  border-radius: 4px; transition: width .3s;
+}
+#reanalyze-result {
+  margin-top: 1rem; background: #252525;
+  border-radius: 8px; padding: .8rem 1rem;
+}
+#reanalyze-result h4 { margin-bottom: .5rem; font-size: .88rem; }
+.re-ex-row {
+  display: flex; justify-content: space-between;
+  font-size: .82rem; padding: .2rem 0;
+  border-bottom: 1px solid #2a2a2a; color: #ccc;
+}
+.re-ex-row:last-child { border-bottom: none; }
+.re-ex-count { color: #888; }
