@@ -38,6 +38,11 @@ def _pick_model() -> str:
 
 _MODEL = _pick_model()
 
+# formcheck-vision has the full exercise vocabulary baked into its Modelfile
+# SYSTEM prompt. Sending an additional system message via the API overrides it,
+# discarding the exercise list. Only send a system message for the base model.
+_USE_MODELFILE_SYSTEM = _MODEL.startswith(_PREFERRED_MODEL)
+
 _FORM_SYSTEM = (
     "You are a form coach. Identify the exercise being performed and check posture/alignment.\n"
     "Return JSON: {\"exercise\":\"Push-Up\",\"issues\":[], \"severity\":\"OK\", \"tip\":\"\"}.\n"
@@ -109,16 +114,19 @@ class Analyzer:
         t_start  = time.time()
         raw_text = ""
         try:
+            # formcheck-vision: skip system message so the Modelfile SYSTEM
+            # (exercise vocabulary) is used instead of being overridden here.
+            messages = []
+            if not _USE_MODELFILE_SYSTEM:
+                messages.append({"role": "system", "content": _FORM_SYSTEM})
+            messages.append({
+                "role":    "user",
+                "content": "Check the form in this exercise frame and reply with JSON only.",
+                "images":  [b64],
+            })
             response = ollama.chat(
                 model=_MODEL,
-                messages=[
-                    {"role": "system", "content": _FORM_SYSTEM},
-                    {
-                        "role":    "user",
-                        "content": "Check the form in this exercise frame and reply with JSON only.",
-                        "images":  [b64],
-                    },
-                ],
+                messages=messages,
                 options={"temperature": 0.0},
             )
             latency          = time.time() - t_start

@@ -236,17 +236,7 @@ async def analysis_loop(websocket, camera: Camera, analyzer: Analyzer,
             alog.warning("analysis_loop: get_frame returned None — skipping")
             continue
 
-        # Landmark angle tracking for post-session rep counting
-        try:
-            landmarks = camera.get_landmarks(raw_frame)
-            if landmarks is not None:
-                # Track elbow and knee angles from both sides
-                for (a, b, c) in [(11, 13, 15), (12, 14, 16), (23, 25, 27), (24, 26, 28)]:
-                    if max(a, b, c) < len(landmarks):
-                        state["angle_series"].append(_joint_angle(landmarks, a, b, c))
-        except Exception as _lm_err:
-            alog.debug("Landmark angle tracking failed: %s", _lm_err)
-
+        # Angle tracking is done in camera_loop at 10 Hz — nothing to do here.
         alog.debug("analysis_loop: dispatching analyze_form to executor")
         t_start = time.time()
 

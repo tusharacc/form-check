@@ -82,8 +82,14 @@ class WatchBridge:
     # ── Heart rate ────────────────────────────────────────────────────────────
 
     def get_heart_rate(self) -> Optional[int]:
-        """Return the most recent heart rate sample in bpm, or None."""
-        if not _HK_AVAILABLE or not self._authorized:
+        """Return the most recent heart rate sample in bpm, or None.
+
+        Does NOT gate on self._authorized — HealthKit authorization persists
+        across restarts in the system keychain. Even if request_authorization()
+        failed at launch (e.g. missing Info.plist key), a previous grant may
+        still be active and the query may succeed. We let HealthKit decide.
+        """
+        if not _HK_AVAILABLE:
             return None
         try:
             hr_type = HKObjectType.quantityTypeForIdentifier_(HKQuantityTypeIdentifierHeartRate)
